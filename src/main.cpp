@@ -7,6 +7,8 @@
 #define CLK_pin 0
 #define DT_pin 1
 #define SW_pin 2
+#define MAX_TEMP 400
+#define MIN_TEMP 0
 
 ENC_t encoder;
 
@@ -28,17 +30,10 @@ void upd_temp(PENC_t encoder_adr);
 
 void setup()
 {
-	Serial.begin(115200);
+	lcd.begin(16, 2);
 	PENC_t encoder_adr = &encoder;
 	init_encoder(encoder_adr, CLK_pin, DT_pin, SW_pin);
 	init_encoder_isr(encoder_adr);
-	lcd.begin(16, 2);
-	lcd.setCursor(0, 0);
-	lcd.print(F("PCF8574 OK!"));
-	lcd.setCursor(0, 1);
-	lcd.print(F("Starting..."));
-	delay(1000);
-	lcd.clear();
 }
 
 void loop()
@@ -95,16 +90,16 @@ void upd_temp(PENC_t encoder_adr)
 	{
 		lcd.clear();
 		noInterrupts();
-		if (flag_inc)
+		if (flag_inc && encoder_adr->count < MAX_TEMP)
 		{
 			encoder_adr->count++;
-			flag_inc = 0;
 		}
-		if (flag_dec)
+		if (flag_dec && encoder_adr->count > MIN_TEMP)
 		{
 			encoder_adr->count--;
-			flag_dec = 0;
 		}
+		flag_inc = 0;
+		flag_dec = 0;
 		interrupts();
 		lcd.setCursor(0, 0);
 		lcd.print(String("Set temp: " + String(encoder_adr->count)));
