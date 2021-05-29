@@ -1,4 +1,7 @@
 #include <Arduino.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
 #include "encoder.h"
 
 #define CLK_pin 0
@@ -6,6 +9,8 @@
 #define SW_pin 2
 
 ENC_t encoder;
+
+LiquidCrystal_I2C lcd(PCF8574_ADDR_A21_A11_A01, 4, 5, 6, 16, 11, 12, 13, 14, POSITIVE);
 
 int set_temp = 0;
 volatile byte flag_inc = 0;
@@ -23,16 +28,21 @@ void setup()
 	init_encoder(encoder_adr, CLK_pin, DT_pin, SW_pin);
 	init_encoder_isr(encoder_adr);
 	Serial.begin(115200);
+	lcd.begin(16, 2);
+	lcd.setCursor(0, 0);
+	lcd.print(F("PCF8574 is OK..."));
+	delay(2000);
+	lcd.clear();
 }
 
 void loop()
 {
 	PENC_t encoder_adr = &encoder;
+	lcd.print(encoder_adr->count);
 	if (flag_inc)
 	{
 		noInterrupts();
 		encoder_adr->count++;
-		Serial.println(encoder_adr->count);
 		flag_inc = 0;
 		interrupts();
 	}
@@ -40,7 +50,6 @@ void loop()
 	{
 		noInterrupts();
 		encoder_adr->count--;
-		Serial.println(encoder_adr->count);
 		flag_dec = 0;
 		interrupts();
 	}
@@ -48,11 +57,11 @@ void loop()
 	{
 		noInterrupts();
 		encoder_adr->count = 0;
-		Serial.println(encoder_adr->count);
 		flag_clicked = 0;
 		interrupts();
 	}
 	delay(10);
+	lcd.clear();
 }
 
 void init_encoder_isr(PENC_t encoder_adr)
