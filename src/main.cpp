@@ -26,6 +26,7 @@ void isr_clk();
 void isr_dt();
 void isr_sw();
 void print_temp(PENC_t encoder_adr);
+void print_temp_set(PENC_t encoder_adr);
 void upd_temp(PENC_t encoder_adr);
 
 void setup()
@@ -84,11 +85,17 @@ void print_temp(PENC_t encoder_adr)
 	lcd.print(String("Set temp: " + String(set_temp)));
 }
 
+void print_temp_set(PENC_t encoder_adr)
+{
+	lcd.clear();
+	lcd.setCursor(0, 0);
+	lcd.print(String("Set temp: " + String(encoder_adr->count)));
+}
+
 void upd_temp(PENC_t encoder_adr)
 {
 	while (flag_upd_temp)
 	{
-		lcd.clear();
 		noInterrupts();
 		if (flag_inc && encoder_adr->count < MAX_TEMP)
 		{
@@ -101,8 +108,7 @@ void upd_temp(PENC_t encoder_adr)
 		flag_inc = 0;
 		flag_dec = 0;
 		interrupts();
-		lcd.setCursor(0, 0);
-		lcd.print(String("Set temp: " + String(encoder_adr->count)));
+		print_temp_set(encoder_adr);
 		delay(30);
 	}
 	if (flag_clicked)
