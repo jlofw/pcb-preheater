@@ -1,45 +1,70 @@
-#include <SimpleButton.h>
+#include <Arduino.h>
 
-using namespace simplebutton;
+int set_temp = 0;
+volatile byte flag_fired = 0;
 
-/*
-   1 Rotary encoder is connected to a Wemos D1 mini (ESP8266)
-   - Rotary encoder "Key" (that's the button) is connected to gpio 12 (D6)
-   - Rotary encoder "S1" is connected to gpio 5 (D1) - that's channel A
-   - Rotary encoder "S4" is connected to gpio 4 (D2) - that's channel B
-   (the labels on your rotary encoder might be different!)
- */
+typedef struct
+{
+    int clk;
+    int dt;
+    int sw;
+    volatile int count;
+} ENC_t, *PENC_t;
 
-RotaryEncoder* myEncoder = NULL;
-int32_t previousPosition = 0;
+ENC_t encoder;
+PENC_t encoder_adr = &encoder;
 
-void setup() {
+void init_encoder(int clk, int dt, int sw);
+void init_encoder_isr();
+void isr_clk();
+void isr_dt();
+
+void setup()
+{ 
+    init_encoder(0, 1, 2);
+    init_encoder_isr();
     Serial.begin(115200);
-    Serial.println();
-
-    myEncoder = new RotaryEncoder(1, 0, 2); // channel-A, channel-B, push button (255 = not used)
-    // myEncoder->setEncoding(2); // <- if it used x2 encoding (x1 is default)
-    myEncoder->setMin(0);
-    myEncoder->setMax(400);
-    // myEncoder->setInverted(true);
-    // myEncoder->enableLoop(true);
-
-    Serial.println("Started");
 }
 
-void loop() {
-    myEncoder->update();
-
-    int32_t currentPosition = myEncoder->getPos();
-
-    if (currentPosition != previousPosition) {
-        previousPosition = currentPosition;
-        Serial.print(currentPosition);
-        if (myEncoder->incremented()) Serial.println(" up");
-        if (myEncoder->decremented()) Serial.println(" down");
+void loop()
+{
+    if (flag_fired)
+    {
+        noInterrupts();
+        Serial.println("FIRED");
+        Serial.println(encoder_adr->count);
+        flag_fired = 0;
+        interrupts();
     }
+}
 
-    if (myEncoder->clicked()) {
-        Serial.println("clicked");
+void init_encoder(int clk, int dt, int sw)
+{
+    encoder_adr->clk = clk;
+    encoder_adr->dt = dt;
+    encoder_adr->sw = sw;
+}
+
+void init_encoder_isr()
+{
+    attachInterrupt(digitalPinToInterrupt(encoder_adr->clk), isr_clk, FALLING);
+    attachInterrupt(digitalPinToInterrupt(encoder_adr->dt), isr_dt, FALLING);
+}
+
+void isr_clk()
+{
+    if (digitalRead(1))
+    {
+        encoder_adr->count++;
+        flag_fired = 1;
+    }
+}
+
+void isr_dt()
+{
+    if (digitalRead(0))
+    {
+        encoder_adr->count--;
+        flag_fired = 1;
     }
 }
