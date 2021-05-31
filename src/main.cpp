@@ -34,9 +34,9 @@ void isr_dt();
 void isr_sw();
 void print_temp(p_encoder_struct encoder_adr);
 void print_set_temp(p_encoder_struct encoder_adr);
-void upd_set_temp(p_encoder_struct encoder_adr);
+void update_set_temp(p_encoder_struct encoder_adr);
 double read_current_temp();
-void output_binary();
+void pid_read_write();
 
 void setup()
 {
@@ -51,9 +51,9 @@ void setup()
 void loop()
 {
 	p_encoder_struct encoder_adr = &encoder;
+	update_set_temp(encoder_adr);
 	print_temp(encoder_adr);
-	upd_set_temp(encoder_adr);
-	output_binary();
+	pid_read_write();
 	delay(30);
 }
 
@@ -110,7 +110,7 @@ void print_set_temp(p_encoder_struct encoder_adr)
 	lcd.print(String("Set temp: " + String(encoder_adr->count)));
 }
 
-void upd_set_temp(p_encoder_struct encoder_adr)
+void update_set_temp(p_encoder_struct encoder_adr)
 {
 	while (flag_upd_set_temp)
 	{
@@ -143,7 +143,7 @@ double read_current_temp()
 	return 100; //DEBUG VALUE
 }
 
-void output_binary()
+void pid_read_write()
 {
 	current_temp = read_current_temp();
 	ssr_pid.Compute();
