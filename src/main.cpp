@@ -8,7 +8,7 @@
 #define CLK_pin 0
 #define DT_pin 1
 #define SW_pin 2
-#define PWM_pin 7
+#define SSR_pin 7
 #define MAX_TEMP 400
 #define MIN_TEMP 0
 #define Kp 2
@@ -16,53 +16,54 @@
 #define Kd 1
 
 double set_temp = 0;
-double pwm_duty = 0;
+double pid_output = 0;
 double current_temp = 0;
 volatile byte flag_inc = 0;
 volatile byte flag_dec = 0;
 volatile byte flag_clicked = 0;
 volatile byte flag_upd_set_temp = 0;
 
-ENC_t encoder;
+encoder_struct encoder;
 LiquidCrystal_I2C lcd(PCF8574_ADDR_A21_A11_A01, 4, 5, 6, 16, 11, 12, 13, 14, POSITIVE);
-PID pwm_pid(&current_temp, &pwm_duty, &set_temp, Kp, Ki, Kd, DIRECT);
+PID ssr_pid(&current_temp, &pid_output, &set_temp, Kp, Ki, Kd, DIRECT);
 
 void init_pid();
-void init_encoder_isr(PENC_t encoder_adr);
+void init_encoder_isr(p_encoder_struct encoder_adr);
 void isr_clk();
 void isr_dt();
 void isr_sw();
-void print_temp(PENC_t encoder_adr);
-void print_set_temp(PENC_t encoder_adr);
-void upd_set_temp(PENC_t encoder_adr);
+void print_temp(p_encoder_struct encoder_adr);
+void print_set_temp(p_encoder_struct encoder_adr);
+void upd_set_temp(p_encoder_struct encoder_adr);
 double read_current_temp();
-void output_pwm();
+void output_binary();
 
 void setup()
 {
-	PENC_t encoder_adr = &encoder;
+	p_encoder_struct encoder_adr = &encoder;
 	lcd.begin(16, 2);
 	init_pid();
 	init_encoder(encoder_adr, CLK_pin, DT_pin, SW_pin);
 	init_encoder_isr(encoder_adr);
+	pinMode(SSR_pin, OUTPUT);
 }
 
 void loop()
 {
-	PENC_t encoder_adr = &encoder;
+	p_encoder_struct encoder_adr = &encoder;
 	print_temp(encoder_adr);
 	upd_set_temp(encoder_adr);
-	output_pwm();
+	output_binary();
 	delay(30);
 }
 
 void init_pid()
 {
-	pwm_pid.SetOutputLimits(0, 255);
-	pwm_pid.SetMode(AUTOMATIC);
+	ssr_pid.SetOutputLimits(0, 1);
+	ssr_pid.SetMode(AUTOMATIC);
 }
 
-void init_encoder_isr(PENC_t encoder_adr)
+void init_encoder_isr(p_encoder_struct encoder_adr)
 {
 	attachInterrupt(digitalPinToInterrupt(encoder_adr->clk), isr_clk, FALLING);
 	attachInterrupt(digitalPinToInterrupt(encoder_adr->dt), isr_dt, FALLING);
@@ -93,7 +94,7 @@ void isr_sw()
 	flag_upd_set_temp = 0;
 }
 
-void print_temp(PENC_t encoder_adr)
+void print_temp(p_encoder_struct encoder_adr)
 {
 	lcd.clear();
 	lcd.setCursor(0, 0);
@@ -102,14 +103,14 @@ void print_temp(PENC_t encoder_adr)
 	lcd.print(String("Set: " + String(set_temp)));
 }
 
-void print_set_temp(PENC_t encoder_adr)
+void print_set_temp(p_encoder_struct encoder_adr)
 {
 	lcd.clear();
 	lcd.setCursor(0, 0);
 	lcd.print(String("Set temp: " + String(encoder_adr->count)));
 }
 
-void upd_set_temp(PENC_t encoder_adr)
+void upd_set_temp(p_encoder_struct encoder_adr)
 {
 	while (flag_upd_set_temp)
 	{
@@ -142,13 +143,13 @@ double read_current_temp()
 	return 100; //DEBUG VALUE
 }
 
-void output_pwm()
+void output_binary()
 {
 	current_temp = read_current_temp();
-	pwm_pid.Compute();
-	analogWrite(PWM_pin, pwm_duty);
+	ssr_pid.Compute();
+	digitalWrite(SSR_pin, pid_output);
 
 	Serial.println(current_temp); //DEBUG
 	Serial.println(set_temp);     //DEBUG
-	Serial.println(pwm_duty);     //DEBUG
+	Serial.println(pid_output);   //DEBUG
 }

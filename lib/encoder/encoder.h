@@ -4,6 +4,6 @@ typedef struct
 	int dt;
 	int sw;
 	volatile int count;
-} ENC_t, *PENC_t;
+} encoder_struct, *p_encoder_struct;
 
-void init_encoder(PENC_t encoder_adr, int clk, int dt, int sw);
+void init_encoder(p_encoder_struct encoder_adr, int clk, int dt, int sw);
