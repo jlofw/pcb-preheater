@@ -2,6 +2,7 @@
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 #include <PID_v1.h>
+#include <Adafruit_MCP9600.h>
 
 #include "encoder.h"
 
@@ -27,12 +28,14 @@ volatile byte flag_set_temp = 0;
 encoder_struct encoder;
 LiquidCrystal_I2C lcd(PCF8574_ADDR_A21_A11_A01, 4, 5, 6, 16, 11, 12, 13, 14, POSITIVE);
 PID ssr_pid(&current_temp, &pid_output, &target_temp, Kp, Ki, Kd, DIRECT);
+Adafruit_MCP9600 mcp;
 
-void init_pid();
-void init_encoder_isr(p_encoder_struct encoder_adr);
 void isr_clk();
 void isr_dt();
 void isr_sw();
+void init_pid();
+void init_encoder_isr(p_encoder_struct encoder_adr);
+void init_mcp9600();
 void print_temp(p_encoder_struct encoder_adr);
 void print_set_temp(p_encoder_struct encoder_adr);
 void print_temp_warning();
@@ -48,6 +51,7 @@ void setup()
 	init_encoder(encoder_adr, CLK_pin, DT_pin, SW_pin);
 	init_encoder_isr(encoder_adr);
 	init_pid();
+	init_mcp9600();
 }
 
 void loop()
@@ -59,20 +63,6 @@ void loop()
 	over_temp_lock();
 	pid_write();
 	delay(30);
-}
-
-void init_pid()
-{
-	ssr_pid.SetOutputLimits(0, 1);
-	ssr_pid.SetMode(AUTOMATIC);
-	pinMode(SSR_pin, OUTPUT);
-}
-
-void init_encoder_isr(p_encoder_struct encoder_adr)
-{
-	attachInterrupt(digitalPinToInterrupt(encoder_adr->clk), isr_clk, FALLING);
-	attachInterrupt(digitalPinToInterrupt(encoder_adr->dt), isr_dt, FALLING);
-	attachInterrupt(digitalPinToInterrupt(encoder_adr->sw), isr_sw, LOW);
 }
 
 void isr_clk()
@@ -99,6 +89,34 @@ void isr_sw()
 	flag_set_temp = 0;
 }
 
+void init_pid()
+{
+	ssr_pid.SetOutputLimits(0, 1);
+	ssr_pid.SetMode(AUTOMATIC);
+	pinMode(SSR_pin, OUTPUT);
+}
+
+void init_encoder_isr(p_encoder_struct encoder_adr)
+{
+	attachInterrupt(digitalPinToInterrupt(encoder_adr->clk), isr_clk, FALLING);
+	attachInterrupt(digitalPinToInterrupt(encoder_adr->dt), isr_dt, FALLING);
+	attachInterrupt(digitalPinToInterrupt(encoder_adr->sw), isr_sw, LOW);
+}
+
+void init_mcp9600()
+{
+	if (!mcp.begin(0x67))
+	{
+		Serial.println("Sensor not found. Check wiring!");
+		while (1)
+			;
+	}
+	mcp.setADCresolution(MCP9600_ADCRESOLUTION_18);
+	mcp.setThermocoupleType(MCP9600_TYPE_K);
+	mcp.setFilterCoefficient(3);
+	mcp.enable(true);
+}
+
 void print_temp(p_encoder_struct encoder_adr)
 {
 	lcd.clear();
@@ -119,9 +137,9 @@ void print_temp_warning()
 {
 	lcd.clear();
 	lcd.setCursor(0, 0);
-	lcd.print(String("OVER TEMP REACHED: " + String(OVER_TEMP_LIMIT)));
+	lcd.print(String("OVER TEMP: " + String(OVER_TEMP_LIMIT)));
 	lcd.setCursor(0, 1);
-	lcd.print("*** PROGRAM LOCKED ***");
+	lcd.print("**** LOCKED ****");
 }
 
 void update_set_temp(p_encoder_struct encoder_adr)
@@ -165,8 +183,7 @@ void over_temp_lock()
 
 void read_current_temp()
 {
-	//read thermocouple
-	current_temp = 100; //DEBUG
+	current_temp = mcp.readThermocouple();
 }
 
 void pid_write()
@@ -175,6 +192,6 @@ void pid_write()
 	digitalWrite(SSR_pin, pid_output);
 
 	Serial.println(current_temp); //DEBUG
-	Serial.println(target_temp);     //DEBUG
+	Serial.println(target_temp);  //DEBUG
 	Serial.println(pid_output);   //DEBUG
 }
