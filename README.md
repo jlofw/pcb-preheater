@@ -1,1 +1,1 @@
-# pcb-reflower (work in progress)
+# pcb-reflower (deprecated)
